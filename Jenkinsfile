@@ -1,47 +1,41 @@
 pipeline {
     agent any
-
     tools {
         nodejs 'NodeJS'
     }
-
     stages {
-        stage('Checkout Code') {
+        stage('Checkout') {
             steps {
-                checkout([
-                    $class: 'GitSCM', 
-                    branches: [[name: 'main']], 
-                    userRemoteConfigs: [[url: 'https://github.com/DatlaBharath/docker-react']]
-                ])
+                git branch: 'main', url: 'https://github.com/DatlaBharath/docker-react'
             }
         }
-        stage('Build Project') {
+        stage('Build') {
             steps {
-                sh 'npm install --no-optional'
-                sh 'npm run build'
+                sh 'npm install --skip-tests'
             }
         }
         stage('Build Docker Image') {
             steps {
                 script {
-                    def imageName = "ratneshpuskar/docker-react:${env.BUILD_NUMBER}"
-                    withCredentials([usernamePassword(credentialsId: 'dockerhub_credentials', usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
-                        sh 'echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin'
-                        sh "docker build -t ${imageName} ."
-                        sh "docker push ${imageName}"
-                        sh 'docker logout'
+                    def imgName = "ratneshpuskar/docker-react:${env.BUILD_NUMBER}"
+                    sh "docker build -t ${imgName} ."
+                    withCredentials([usernamePassword(credentialsId: 'dockerhub_credentials', passwordVariable: 'PASSWORD', usernameVariable: 'USERNAME')]) {
+                        sh "echo $PASSWORD | docker login -u $USERNAME --password-stdin"
+                        sh "docker push ${imgName}"
                     }
                 }
             }
         }
-        stage('Create and Deploy YAMLs') {
+        stage('Deploy to Kubernetes') {
             steps {
                 script {
-                    def deployment = """
+                    def deploymentYaml = """
                     apiVersion: apps/v1
                     kind: Deployment
                     metadata:
                       name: docker-react
+                      labels:
+                        app: docker-react
                     spec:
                       replicas: 1
                       selector:
@@ -58,37 +52,32 @@ pipeline {
                             ports:
                             - containerPort: 80
                     """
-                    def service = """
+                    def serviceYaml = """
                     apiVersion: v1
                     kind: Service
                     metadata:
                       name: docker-react
                     spec:
                       type: NodePort
+                      ports:
+                        - port: 80
+                          nodePort: 30007
+                          protocol: TCP
                       selector:
                         app: docker-react
-                      ports:
-                        - protocol: TCP
-                          port: 80
-                          targetPort: 80
-                          nodePort: 30007
                     """
-                    writeFile file: 'deployment.yaml', text: deployment
-                    writeFile file: 'service.yaml', text: service
-
-                    sh 'ssh -i /var/test.pem -o StrictHostKeyChecking=no ubuntu@3.109.185.68 "kubectl apply -f -" < deployment.yaml'
-                    sh 'ssh -i /var/test.pem -o StrictHostKeyChecking=no ubuntu@3.109.185.68 "kubectl apply -f -" < service.yaml'
+                    sh "echo \"${deploymentYaml}\" | ssh -i /var/test.pem -o StrictHostKeyChecking=no ubuntu@15.206.66.91 'kubectl apply -f -'"
+                    sh "echo \"${serviceYaml}\" | ssh -i /var/test.pem -o StrictHostKeyChecking=no ubuntu@15.206.66.91 'kubectl apply -f -'"
                 }
             }
         }
     }
-
     post {
         success {
-            echo 'Deployment was successful!'
+            echo 'Deployment Successful!'
         }
         failure {
-            echo 'Deployment failed!'
+            echo 'Deployment Failed!'
         }
     }
 }
