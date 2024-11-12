@@ -25,11 +25,11 @@ pipeline {
                     def imageName = "ratneshpuskar/docker-react:${env.BUILD_NUMBER}"
                     
                     withCredentials([usernamePassword(credentialsId: 'dockerhub_credentials', passwordVariable: 'DOCKER_PASS', usernameVariable: 'DOCKER_USER')]) {
-                        sh '''
+                        sh """
                             echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
                             docker build -t ${imageName} .
                             docker push ${imageName}
-                        '''
+                        """
                     }
                 }
             }
