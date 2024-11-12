@@ -1,98 +1,85 @@
-pipeline {
-    agent any
-
-    tools {
-        nodejs 'NodeJS'
-    }
-
-    stages {
-        stage('Checkout') {
-            steps {
-                git url: 'https://github.com/DatlaBharath/docker-react', branch: 'main'
-            }
+    pipeline {
+        agent any
+        tools {
+            nodejs 'NodeJS'
         }
-        stage('Build') {
-            steps {
-                sh 'npm install --only=dev'
-                sh 'npm run build --if-present'
-            }
-        }
-        stage('Build Docker Image') {
-            steps {
-                script {
-                    def imageName = "ratneshpuskar/docker-react:${env.BUILD_NUMBER}"
-                    sh """
-                        docker build -t ${imageName} .
-                    """
+        stages {
+            stage('Checkout') {
+                steps {
+                    git branch: 'main', url: 'https://github.com/DatlaBharath/docker-react'
                 }
             }
-        }
-        stage('Push Docker Image') {
-            steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub_credentials', usernameVariable: 'DOCKERHUB_USER', passwordVariable: 'DOCKERHUB_PASS')]) {
-                    sh 'echo ${DOCKERHUB_PASS} | docker login -u ${DOCKERHUB_USER} --password-stdin'
-                    sh 'docker push ratneshpuskar/docker-react:${env.BUILD_NUMBER}'
+            stage('Build') {
+                steps {
+                    sh 'npm install --no-optional'
+                    sh 'npm run build --skip-tests'
                 }
             }
-        }
-        stage('Deploy to Kubernetes') {
-            steps {
-                script {
-                    def deploymentYaml = """
-                    apiVersion: apps/v1
-                    kind: Deployment
-                    metadata:
-                      name: docker-react
-                    spec:
-                      replicas: 1
-                      selector:
-                        matchLabels:
-                          app: docker-react
-                      template:
+            stage('Docker Build and Push') {
+                steps {
+                    script {
+                        def repoName = 'docker-react'.toLowerCase()
+                        def imageName = "ratneshpuskar/${repoName}:${env.BUILD_NUMBER}"
+                        withCredentials([usernamePassword(credentialsId: 'dockerhub_credentials', passwordVariable: 'DOCKERHUB_PASSWORD', usernameVariable: 'DOCKERHUB_USERNAME')]) {
+                            sh 'echo ${DOCKERHUB_PASSWORD}'
+                            sh 'docker login -u $DOCKERHUB_USERNAME -p $DOCKERHUB_PASSWORD'
+                            sh "docker build -t ${imageName} ."
+                            sh "docker push ${imageName}"
+                        }
+                    }
+                }
+            }
+            stage('Deploy to Kubernetes') {
+                steps {
+                    script {
+                        def repoName = 'docker-react'.toLowerCase()
+                        def deploymentYaml = """
+                        apiVersion: apps/v1
+                        kind: Deployment
                         metadata:
-                          labels:
-                            app: docker-react
+                          name: ${repoName}
                         spec:
-                          containers:
-                            - name: docker-react
-                              image: ratneshpuskar/docker-react:${env.BUILD_NUMBER}
-                              ports:
+                          replicas: 1
+                          selector:
+                            matchLabels:
+                              app: ${repoName}
+                          template:
+                            metadata:
+                              labels:
+                                app: ${repoName}
+                            spec:
+                              containers:
+                              - name: ${repoName}
+                                image: ratneshpuskar/${repoName}:${env.BUILD_NUMBER}
+                                ports:
                                 - containerPort: 80
-                    """
-
-                    def serviceYaml = """
-                    apiVersion: v1
-                    kind: Service
-                    metadata:
-                      name: docker-react
-                    spec:
-                      type: NodePort
-                      ports:
-                        - port: 80
-                          targetPort: 80
-                          nodePort: 30008
-                      selector:
-                        app: docker-react
-                    """
-                    
-                    sh """
-                        echo "${deploymentYaml}" > deployment.yaml
-                        echo "${serviceYaml}" > service.yaml 
-
-                        ssh -i /var/test.pem -o StrictHostKeyChecking=no ubuntu@13.234.110.244 "kubectl apply -f -" < deployment.yaml
-                        ssh -i /var/test.pem -o StrictHostKeyChecking=no ubuntu@13.234.110.244 "kubectl apply -f -" < service.yaml
-                    """
+                        """
+                        def serviceYaml = """
+                        apiVersion: v1
+                        kind: Service
+                        metadata:
+                          name: ${repoName}
+                        spec:
+                          type: NodePort
+                          selector:
+                            app: ${repoName}
+                          ports:
+                          - port: 80
+                            targetPort: 80
+                            nodePort: 30007
+                        """
+                        sh "ssh -i /var/test.pem -o StrictHostKeyChecking=no ubuntu@13.234.110.244 'kubectl apply -f -' <<< \""\"${deploymentYaml}\"\""
+                        sh "ssh -i /var/test.pem -o StrictHostKeyChecking=no ubuntu@13.234.110.244 'kubectl apply -f -' <<< \""\"${serviceYaml}\"\""
+                    }
                 }
             }
         }
-    }
-
-    post {
-        success {
-            echo 'The deployment was successful!'
+        post {
+            success {
+                echo 'Deployment was successful!'
+            }
+            failure {
+                echo 'Deployment failed!'
+            }
         }
-        failure {
-            echo 'The deployment failed.'
-        }
     }
-}
