@@ -55,7 +55,7 @@ pipeline {
                           - name: docker-react
                             image: ratneshpuskar/docker-react:${env.BUILD_NUMBER}
                             ports:
-                            - containerPort: 5000
+                            - containerPort: 80
                     """
 
                     def serviceYaml = """
@@ -68,8 +68,8 @@ pipeline {
                       selector:
                         app: docker-react
                       ports:
-                      - port: 5000
-                        targetPort: 5000
+                      - port: 80
+                        targetPort: 80
                         nodePort: 30007
                     """
 
