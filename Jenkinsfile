@@ -1,30 +1,28 @@
 pipeline {
     agent any
-
+    
     tools {
         nodejs "NodeJS"
     }
-    
+
     stages {
         stage('Checkout') {
             steps {
-                checkout([$class: 'GitSCM', branches: [[name: 'main']], doGenerateSubmoduleConfigurations: false, extensions: [], userRemoteConfigs: [[url: 'https://github.com/DatlaBharath/docker-react']]])
+                git branch: 'main', url: 'https://github.com/DatlaBharath/docker-react'
             }
         }
-        
+
         stage('Build') {
             steps {
-                sh 'npm install --no-audit --no-fund --no-optional'
-                sh 'npm run build --if-present || echo "skip tests"'
+                sh 'npm install --silent'
+                sh 'npm run build --silent --skip-tests'
             }
         }
-        
+
         stage('Build Docker Image') {
             steps {
                 script {
-                    def repoName = "docker-react"
-                    def buildNumber = "${env.BUILD_NUMBER}"
-                    def imageName = "ratneshpuskar/${repoName.toLowerCase()}:${buildNumber}"
+                    def imageName = "ratneshpuskar/docker-react:${env.BUILD_NUMBER}"
                     sh "docker build -t ${imageName} ."
                 }
             }
@@ -32,12 +30,11 @@ pipeline {
 
         stage('Push Docker Image') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub_credentials', passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USERNAME')]) {
-                    sh 'echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin'
+                withCredentials([usernamePassword(credentialsId: 'dockerhub_credentials', passwordVariable: 'dockerHubPassword', usernameVariable: 'dockerHubUsername')]) {
                     script {
-                        def repoName = "docker-react"
-                        def buildNumber = "${env.BUILD_NUMBER}"
-                        def imageName = "ratneshpuskar/${repoName.toLowerCase()}:${buildNumber}"
+                        sh "echo $dockerHubPassword | docker login -u $dockerHubUsername --password-stdin"
+                        def imageName = "ratneshpuskar/docker-react:${env.BUILD_NUMBER}"
+                        sh "docker tag ${imageName} ratneshpuskar/docker-react:latest"
                         sh "docker push ${imageName}"
                     }
                 }
@@ -47,64 +44,59 @@ pipeline {
         stage('Deploy to Kubernetes') {
             steps {
                 script {
-                    def repoName = "docker-react"
-                    def buildNumber = "${env.BUILD_NUMBER}"
-                    def imageName = "ratneshpuskar/${repoName.toLowerCase()}:${buildNumber}"
                     def deploymentYaml = """
-                    apiVersion: apps/v1
-                    kind: Deployment
-                    metadata:
-                      name: ${repoName.toLowerCase()}
-                    spec:
-                      replicas: 1
-                      selector:
-                        matchLabels:
-                          app: ${repoName.toLowerCase()}
-                      template:
-                        metadata:
-                          labels:
-                            app: ${repoName.toLowerCase()}
-                        spec:
-                          containers:
-                          - name: ${repoName.toLowerCase()}
-                            image: ${imageName}
-                            ports:
-                            - containerPort: 80
-                    """
-
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: docker-react
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: docker-react
+  template:
+    metadata:
+      labels:
+        app: docker-react
+    spec:
+      containers:
+        - name: docker-react
+          image: ratneshpuskar/docker-react:${env.BUILD_NUMBER}
+          ports:
+            - containerPort: 80
+"""
                     def serviceYaml = """
-                    apiVersion: v1
-                    kind: Service
-                    metadata:
-                      name: ${repoName.toLowerCase()}
-                    spec:
-                      type: NodePort
-                      selector:
-                        app: ${repoName.toLowerCase()}
-                      ports:
-                        - protocol: TCP
-                          port: 80
-                          targetPort: 80
-                          nodePort: 30008
-                    """
+apiVersion: v1
+kind: Service
+metadata:
+  name: docker-react
+spec:
+  selector:
+    app: docker-react
+  ports:
+    - protocol: TCP
+      port: 80
+      nodePort: 30007
+  type: NodePort
+"""
 
-                    writeFile file: 'deployment.yaml', text: deploymentYaml
-                    writeFile file: 'service.yaml', text: serviceYaml
-
-                    sh 'ssh -i /var/test.pem -o StrictHostKeyChecking=no ubuntu@13.234.110.244 "kubectl apply -f -" < deployment.yaml'
-                    sh 'ssh -i /var/test.pem -o StrictHostKeyChecking=no ubuntu@13.234.110.244 "kubectl apply -f -" < service.yaml'
+                    sh """
+echo "${deploymentYaml}" > deployment.yaml
+echo "${serviceYaml}" > service.yaml
+ssh -i /var/test.pem -o StrictHostKeyChecking=no ubuntu@13.201.58.215 "kubectl apply -f -" < deployment.yaml
+ssh -i /var/test.pem -o StrictHostKeyChecking=no ubuntu@13.201.58.215 "kubectl apply -f -" < service.yaml 
+"""
                 }
             }
         }
     }
-    
+
     post {
         success {
-            echo 'Pipeline executed successfully!'
+            echo 'Job succeeded!'
         }
-        
         failure {
-            echo 'Pipeline execution failed!'
+            echo 'Job failed!'
         }
     }
 }
