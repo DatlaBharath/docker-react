@@ -68,8 +68,9 @@ spec:
     - protocol: TCP
       port: 80
       targetPort: 80
+      nodePort: 30007
   type: NodePort
-  nodePort: 30007
+  
 """
                     sh "echo '${deploymentYaml}' > deployment.yaml"
                     sh "echo '${serviceYaml}' > service.yaml"
