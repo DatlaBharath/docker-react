@@ -13,6 +13,8 @@ jobs:
         uses: actions/checkout@v2
       - name: Install dependencies
         run: sudo apt install -y nodejs npm
+      - name: Install Project
+        run: npm install
       - name: Build project
         run: npm run build --if-present --skip-tests
 
