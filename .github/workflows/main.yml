@@ -1,82 +1,89 @@
-name: CI/CD Pipeline
+  name: CI/CD Pipeline
+  on:
+    push:
+      branches:
+        - main
 
-on:
-  push:
-    branches:
-      - main
+  jobs:
+    build_project:
+      runs-on: self-hosted
+      steps:
+        - name: Checkout code
+          uses: actions/checkout@v2
 
-jobs:
-  build_project:
-    runs-on: self-hosted
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v2
-      - name: Install Node.js and npm
-        run: |
-          sudo apt update
-          sudo apt install -y nodejs npm
-      - name: Build the project
-        run: npm install && npm run build --if-present --ignore-scripts
+        - name: Install Node.js
+          run: sudo apt-get update && sudo apt-get install -y nodejs npm
 
-  build_image:
-    runs-on: self-hosted
-    needs: build_project
-    steps:
-      - name: Build Docker image
-        run: docker build -t sakthisiddu1/docker-react:${{ github.run_number }} .
+        - name: Build Project
+          run: npm install && npm run build --if-present
 
-  push_image:
-    runs-on: self-hosted
-    needs: build_image
-    steps:
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_PASSWORD }}
-      - name: Push Docker image
-        run: docker push sakthisiddu1/docker-react:${{ github.run_number }}
+    build_image:
+      runs-on: self-hosted
+      needs: build_project
+      steps:
+        - name: Build Docker Image
+          run: docker build -t sakthisiddu1/helloservice:${{ github.run_number }} .
 
-  deploy:
-    runs-on: self-hosted
-    needs: push_image
-    steps:
-      - name: Create deployment.yaml
-        run: |
-          echo "apiVersion: apps/v1
-          kind: Deployment
-          metadata:
-            name: react-app
-          spec:
-            replicas: 1
-            selector:
-              matchLabels:
-                app: react-app
-            template:
-              metadata:
-                labels:
-                  app: react-app
-              spec:
-                containers:
-                - name: react-app
-                  image: sakthisiddu1/docker-react:${{ github.run_number }}
-                  ports:
-                  - containerPort: 80" > deployment.yaml
-      - name: Create service.yaml
-        run: |
-          echo "apiVersion: v1
-          kind: Service
-          metadata:
-            name: react-service
-          spec:
-            type: NodePort
-            selector:
-              app: react-app
-            ports:
-            - port: 80
-              nodePort: 30007
-              targetPort: 80" > service.yaml
-      - name: Apply Kubernetes configuration
-        run: |
-          ssh -o StrictHostKeyChecking=no -i /home/ubuntu/.ssh/test.pem ubuntu@65.2.184.140 "kubectl apply -f -" < deployment.yaml
-          ssh -i /home/ubuntu/.ssh/test.pem -o StrictHostKeyChecking=no ubuntu@65.2.184.140 "kubectl apply -f -" < service.yaml
+    push_image:
+      runs-on: self-hosted
+      needs: build_image
+      steps:
+        - name: Log in to Docker Hub
+          uses: docker/login-action@v2
+          with:
+            username: ${{ secrets.DOCKERHUB_USERNAME }}
+            password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+        - name: Push Docker Image
+          run: docker push sakthisiddu1/helloservice:${{ github.run_number }}
+
+    deploy:
+      runs-on: self-hosted
+      needs: push_image
+      steps:
+        - name: Create Deployment File
+          run: |
+            echo "
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: helloservice-deployment
+            spec:
+              replicas: 2
+              selector:
+                matchLabels:
+                  app: helloservice
+              template:
+                metadata:
+                  labels:
+                    app: helloservice
+                spec:
+                  containers:
+                  - name: helloservice
+                    image: sakthisiddu1/helloservice:${{ github.run_number }}
+                    ports:
+                    - containerPort: 80
+            " > deployment.yaml
+
+        - name: Create Service File
+          run: |
+            echo "
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: helloservice-service
+            spec:
+              type: NodePort
+              selector:
+                app: helloservice
+              ports:
+                - protocol: TCP
+                  port: 80
+                  targetPort: 80
+                  nodePort: 30007
+            " > service.yaml
+
+        - name: Deploy to Kubernetes
+          run: |
+            ssh -o StrictHostKeyChecking=no -i /home/ubuntu/.ssh/test.pem ubuntu@3.6.38.156 "kubectl apply -f -" < deployment.yaml
+            ssh -i /home/ubuntu/.ssh/test.pem -o StrictHostKeyChecking=no ubuntu@3.6.38.156 "kubectl apply -f -" < service.yaml
