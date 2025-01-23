@@ -1,36 +1,45 @@
 pipeline {
     agent any
+
     tools {
-        nodejs "NodeJS"
+        nodejs 'NodeJS'
     }
+
     stages {
         stage('Checkout') {
             steps {
                 git branch: 'main', url: 'https://github.com/DatlaBharath/docker-react'
             }
         }
+
         stage('Build') {
             steps {
-                sh 'npm install --only=prod'
-                sh 'npm run build --if-present'
+                sh 'npm install'
+                sh 'npm run build'
             }
         }
+
         stage('Build Docker Image') {
             steps {
                 script {
-                    def dockerImage = "ratneshpuskar/docker-react:${env.BUILD_NUMBER}"
-                    sh "docker build -t ${dockerImage} ."
+                    def imageName = "ratneshpuskar/docker-react:${env.BUILD_NUMBER}"
+                    sh "docker build -t ${imageName} ."
                 }
             }
         }
-        stage('Push to Docker Hub') {
+
+        stage('Push Docker Image') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub_credentials', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                    sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
-                    sh "docker push ratneshpuskar/docker-react:${env.BUILD_NUMBER}"
+                script {
+                    withCredentials([usernamePassword(credentialsId: 'dockerhub_credentials', passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USERNAME')]) {
+                        sh "echo ${DOCKER_PASSWORD} | docker login -u ${DOCKER_USERNAME} --password-stdin"
+                        def imageName = "ratneshpuskar/docker-react:${env.BUILD_NUMBER}"
+                        sh "docker push ${imageName}"
+                    }
                 }
             }
         }
+
         stage('Deploy to Kubernetes') {
             steps {
                 script {
@@ -38,57 +47,58 @@ pipeline {
                     apiVersion: apps/v1
                     kind: Deployment
                     metadata:
-                      name: react-deployment
+                      name: docker-react-deployment
+                      labels:
+                        app: docker-react
                     spec:
                       replicas: 1
                       selector:
                         matchLabels:
-                          app: react
+                          app: docker-react
                       template:
                         metadata:
                           labels:
-                            app: react
+                            app: docker-react
                         spec:
                           containers:
-                          - name: react-container
+                          - name: docker-react
                             image: ratneshpuskar/docker-react:${env.BUILD_NUMBER}
                             ports:
                             - containerPort: 80
                     """
-                    
+
                     def serviceYaml = """
                     apiVersion: v1
                     kind: Service
                     metadata:
-                      name: react-service
+                      name: docker-react-service
                     spec:
                       selector:
-                        app: react
+                        app: docker-react
                       ports:
-                        - protocol: TCP
-                          port: 80
-                          targetPort: 80
-                          nodePort: 30007
+                      - protocol: TCP
+                        port: 80
+                        targetPort: 80
+                        nodePort: 30007
                       type: NodePort
                     """
-                    
-                    writeFile file: 'deployment.yaml', text: deploymentYaml
-                    writeFile file: 'service.yaml', text: serviceYaml
-                    
-                    sh """
-                    ssh -i /var/test.pem -o StrictHostKeyChecking=no ubuntu@3.6.238.137 "kubectl apply -f -" < deployment.yaml
-                    ssh -i /var/test.pem -o StrictHostKeyChecking=no ubuntu@3.6.238.137 "kubectl apply -f -" < service.yaml
-                    """
+
+                    sh """echo "${deploymentYaml}" > deployment.yaml"""
+                    sh """echo "${serviceYaml}" > service.yaml"""
+
+                    sh 'ssh -i /var/test.pem -o StrictHostKeyChecking=no ubuntu@3.6.238.137 "kubectl apply -f -" < deployment.yaml'
+                    sh 'ssh -i /var/test.pem -o StrictHostKeyChecking=no ubuntu@3.6.238.137 "kubectl apply -f -" < service.yaml'
                 }
             }
         }
     }
+
     post {
         success {
-            echo 'Deployment completed successfully!'
+            echo 'Deployment was successful'
         }
         failure {
-            echo 'Deployment failed!'
+            echo 'Deployment failed'
         }
     }
 }
