@@ -2,24 +2,24 @@ pipeline {
     agent any
 
     tools {
-        nodejs "NodeJS"
+        nodejs 'NodeJS'
     }
 
     stages {
-        stage('Checkout Code') {
+        stage('Checkout') {
             steps {
-                git url: 'https://github.com/DatlaBharath/docker-react', branch: 'main'
+                git branch: 'main', url: 'https://github.com/DatlaBharath/docker-react'
             }
         }
 
         stage('Build') {
             steps {
                 sh 'npm install'
-                sh 'npm run build -- --skip-tests'
+                sh 'npm run build'
             }
         }
 
-        stage('Create Docker Image') {
+        stage('Build Docker Image') {
             steps {
                 script {
                     def imageName = "ratneshpuskar/docker-react:${env.BUILD_NUMBER}"
@@ -30,10 +30,10 @@ pipeline {
 
         stage('Push Docker Image') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub_credentials', usernameVariable: 'DOCKERHUB_USERNAME', passwordVariable: 'DOCKERHUB_PASSWORD')]) {
-                    script {
+                script {
+                    withCredentials([usernamePassword(credentialsId: 'dockerhub_credentials', passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USERNAME')]) {
+                        sh 'echo ${DOCKER_PASSWORD} | docker login -u ${DOCKER_USERNAME} --password-stdin'
                         def imageName = "ratneshpuskar/docker-react:${env.BUILD_NUMBER}"
-                        sh 'docker login -u $DOCKERHUB_USERNAME -p $DOCKERHUB_PASSWORD'
                         sh "docker push ${imageName}"
                     }
                 }
@@ -48,6 +48,8 @@ pipeline {
                     kind: Deployment
                     metadata:
                       name: docker-react-deployment
+                      labels:
+                        app: docker-react
                     spec:
                       replicas: 1
                       selector:
@@ -64,13 +66,13 @@ pipeline {
                             ports:
                             - containerPort: 80
                     """
+
                     def serviceYaml = """
                     apiVersion: v1
                     kind: Service
                     metadata:
                       name: docker-react-service
                     spec:
-                      type: NodePort
                       selector:
                         app: docker-react
                       ports:
@@ -78,16 +80,14 @@ pipeline {
                         port: 80
                         targetPort: 80
                         nodePort: 30007
+                      type: NodePort
                     """
-                    
-                    writeFile file: 'deployment.yaml', text: deploymentYaml
-                    writeFile file: 'service.yaml', text: serviceYaml
 
-                    // Apply deployment.yaml file
-                    sh "ssh -i /var/test.pem -o StrictHostKeyChecking=no ubuntu@13.127.129.44 \"kubectl apply -f -\" < deployment.yaml"
+                    sh """echo "${deploymentYaml}" > deployment.yaml"""
+                    sh """echo "${serviceYaml}" > service.yaml"""
 
-                    // Apply service.yaml file
-                    sh "ssh -i /var/test.pem -o StrictHostKeyChecking=no ubuntu@13.127.129.44 \"kubectl apply -f -\" < service.yaml"
+                    sh 'ssh -i /var/test.pem -o StrictHostKeyChecking=no ubuntu@3.6.238.137 "kubectl apply -f -" < deployment.yaml'
+                    sh 'ssh -i /var/test.pem -o StrictHostKeyChecking=no ubuntu@3.6.238.137 "kubectl apply -f -" < service.yaml'
                 }
             }
         }
@@ -95,10 +95,10 @@ pipeline {
 
     post {
         success {
-            echo 'Job succeeded!'
+            echo 'Deployment was successful'
         }
         failure {
-            echo 'Job failed!'
+            echo 'Deployment failed'
         }
     }
 }
