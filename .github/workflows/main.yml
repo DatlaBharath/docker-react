@@ -13,18 +13,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v2
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: '16'
 
-      - name: Install npm dependencies
+      - name: Install dependencies
         run: npm install
 
       - name: Build project
         run: npm run build
 
-      - name: Build Docker Image
+      - name: Build Docker image
         run: docker build -t sakthisiddu1/docker-react:${{ github.run_number }} .
 
       - name: Log in to Docker Hub
@@ -33,13 +33,8 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
-      - name: Push Docker Image
+      - name: Push Docker image
         run: docker push sakthisiddu1/docker-react:${{ github.run_number }}
-
-      - name: Setup kubectl
-        uses: azure/setup-kubectl@v1
-        with:
-          version: 'latest'
 
       - name: Deploy to Kubernetes
         run: |
@@ -86,10 +81,10 @@ jobs:
           ssh -i /home/ubuntu/.ssh/test.pem -o StrictHostKeyChecking=no ubuntu@13.203.9.97 "kubectl apply -f -" < deployment.yaml
           ssh -i /home/ubuntu/.ssh/test.pem -o StrictHostKeyChecking=no ubuntu@13.203.9.97 "kubectl apply -f -" < service.yaml
 
-      - name: Deployment success status
+      - name: Post-deployment success
         if: success()
         run: echo 'Deployment was successful'
 
-      - name: Deployment failure status
+      - name: Post-deployment failure
         if: failure()
         run: echo 'Deployment failed'
