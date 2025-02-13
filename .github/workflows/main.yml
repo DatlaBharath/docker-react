@@ -82,9 +82,3 @@ jobs:
 
           ssh -i /var/test.pem -o StrictHostKeyChecking=no ubuntu@13.203.9.97 "kubectl apply -f -" < deployment.yaml
           ssh -i /var/test.pem -o StrictHostKeyChecking=no ubuntu@13.203.9.97 "kubectl apply -f -" < service.yaml
-
-  post:
-    success:
-      run: echo 'Deployment was successful'
-    failure:
-      run: echo 'Deployment failed'
