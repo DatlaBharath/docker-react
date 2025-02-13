@@ -59,7 +59,7 @@ jobs:
               spec:
                 containers:
                 - name: docker-react
-                  image: ratneshpuskar/docker-react:${{ github.run_number }}
+                  image: sakthisiddu1/docker-react:${{ github.run_number }}
                   ports:
                   - containerPort: 80
           " > deployment.yaml
