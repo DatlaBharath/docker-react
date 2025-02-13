@@ -1,4 +1,4 @@
-name: CI Pipeline
+name: CI/CD Pipeline
 
 on:
   push:
@@ -13,18 +13,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v2
         with:
           node-version: '16'
 
-      - name: Install dependencies
+      - name: Install npm dependencies
         run: npm install
 
       - name: Build project
         run: npm run build
 
-      - name: Build Docker image
+      - name: Build Docker Image
         run: docker build -t sakthisiddu1/docker-react:${{ github.run_number }} .
 
       - name: Log in to Docker Hub
@@ -33,12 +33,15 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
-      - name: Push Docker image
+      - name: Push Docker Image
         run: docker push sakthisiddu1/docker-react:${{ github.run_number }}
 
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v1
+        with:
+          version: 'latest'
+
       - name: Deploy to Kubernetes
-        env:
-          KUBERNETES_INSTANCE_IP: ${{ secrets.KUBERNETES_INSTANCE_IP }}
         run: |
           echo "
           apiVersion: apps/v1
@@ -80,5 +83,13 @@ jobs:
             type: NodePort
           " > service.yaml
 
-          ssh -i /home/ubuntu/.ssh/test.pem -o StrictHostKeyChecking=no ubuntu@13.203.9.97 "kubectl apply -f -" < deployment.yaml
-          ssh -i /home/ubuntu/.ssh/test.pem -o StrictHostKeyChecking=no ubuntu@13.203.9.97 "kubectl apply -f -" < service.yaml
+          ssh -i /home/ubuntu/.ssh/test.pem -o StrictHostKeyChecking=no ubuntu@<KUBERNETES_INSTANCE_IP> "kubectl apply -f -" < deployment.yaml
+          ssh -i /home/ubuntu/.ssh/test.pem -o StrictHostKeyChecking=no ubuntu@<KUBERNETES_INSTANCE_IP> "kubectl apply -f -" < service.yaml
+
+      - name: Deployment success status
+        if: success()
+        run: echo 'Deployment was successful'
+
+      - name: Deployment failure status
+        if: failure()
+        run: echo 'Deployment failed'
