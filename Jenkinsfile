@@ -64,7 +64,7 @@ pipeline {
                           - name: docker-react
                             image: ratneshpuskar/docker-react:${env.BUILD_NUMBER}
                             ports:
-                            - containerPort: 80
+                            - containerPort: 5000
                     """
 
                     def serviceYaml = """
@@ -77,8 +77,8 @@ pipeline {
                         app: docker-react
                       ports:
                       - protocol: TCP
-                        port: 80
-                        targetPort: 80
+                        port: 5000
+                        targetPort: 5000
                         nodePort: 30007
                       type: NodePort
                     """
@@ -86,8 +86,8 @@ pipeline {
                     sh """echo "${deploymentYaml}" > deployment.yaml"""
                     sh """echo "${serviceYaml}" > service.yaml"""
 
-                    sh 'ssh -i /var/test.pem -o StrictHostKeyChecking=no ubuntu@3.6.238.137 "kubectl apply -f -" < deployment.yaml'
-                    sh 'ssh -i /var/test.pem -o StrictHostKeyChecking=no ubuntu@3.6.238.137 "kubectl apply -f -" < service.yaml'
+                    sh 'ssh -i /var/test.pem -o StrictHostKeyChecking=no ubuntu@52.66.85.33 "kubectl apply -f -" < deployment.yaml'
+                    sh 'ssh -i /var/test.pem -o StrictHostKeyChecking=no ubuntu@52.66.85.33 "kubectl apply -f -" < service.yaml'
                 }
             }
         }
