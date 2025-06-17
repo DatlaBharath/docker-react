@@ -65,7 +65,7 @@ export default function App() {
             WebkitTextFillColor: 'transparent',
             backgroundClip: 'text'
           }}>
-            ✨ Todo List
+            Todo List
           </h1>
           <p style={{
             color: 'rgba(255, 255, 255, 0.7)',
@@ -148,7 +148,7 @@ export default function App() {
               color: 'rgba(255, 255, 255, 0.5)',
               fontSize: '18px'
             }}>
-              🎯 Start by adding your first task!
+               Start by adding your first task!
             </div>
           ) : (
             tasks.map((task) => (
@@ -242,7 +242,7 @@ export default function App() {
                     e.target.style.transform = 'scale(1)';
                   }}
                 >
-                  🗑️
+                  Delete
                 </button>
               </div>
             ))
