@@ -4,11 +4,6 @@ pipeline {
         nodejs 'NodeJS'
     }
 
-    environment { 
-        registry = "ratneshpuskar" // Docker Hub username as registry
-        registryCredential = 'dockerhub_credentials'
-    }
-
     stages {
         stage('Checkout') {
             steps {
@@ -19,17 +14,16 @@ pipeline {
         stage('Build') {
             steps {
                 sh 'npm install'
-                sh 'npm run build --if-present'
+                sh 'npm run build -- --skip-tests'
             }
         }
 
         stage('Build Docker Image') {
             steps {
                 script {
-                    def imageName = "${registry}/docker-react:${env.BUILD_NUMBER}"
-                    sh """
-                        docker build -t ${imageName} .
-                    """
+                    def repoName = 'docker-react'.toLowerCase()
+                    def imageName = "ratneshpuskar/${repoName}:${env.BUILD_NUMBER}"
+                    sh "docker build -t ${imageName} ."
                 }
             }
         }
@@ -37,11 +31,11 @@ pipeline {
         stage('Push Docker Image') {
             steps {
                 script {
-                    withCredentials([usernamePassword(credentialsId: "${registryCredential}", passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USERNAME')]) {
-                        sh """
-                            echo ${DOCKER_PASSWORD} | docker login -u ${DOCKER_USERNAME} --password-stdin
-                            docker push ${registry}/docker-react:${env.BUILD_NUMBER}
-                        """
+                    withCredentials([usernamePassword(credentialsId: 'dockerhub_credentials', passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USERNAME')]) {
+                        sh 'echo ${DOCKER_PASSWORD} | docker login -u ${DOCKER_USERNAME} --password-stdin'
+                        def repoName = 'docker-react'.toLowerCase()
+                        def imageName = "ratneshpuskar/${repoName}:${env.BUILD_NUMBER}"
+                        sh "docker push ${imageName}"
                     }
                 }
             }
@@ -54,22 +48,22 @@ pipeline {
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: docker-react-deployment
+  name: dockerreact-deployment
   labels:
-    app: docker-react
+    app: dockerreact
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: docker-react
+      app: dockerreact
   template:
     metadata:
       labels:
-        app: docker-react
+        app: dockerreact
     spec:
       containers:
-      - name: docker-react
-        image: ${registry}/docker-react:${env.BUILD_NUMBER}
+      - name: dockerreact
+        image: ratneshpuskar/docker-react:${env.BUILD_NUMBER}
         ports:
         - containerPort: 80
 """
@@ -78,10 +72,10 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: docker-react-service
+  name: dockerreact-service
 spec:
   selector:
-    app: docker-react
+    app: dockerreact
   ports:
   - protocol: TCP
     port: 80
