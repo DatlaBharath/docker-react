@@ -1,5 +1,6 @@
 pipeline {
     agent any
+
     tools {
         nodejs 'NodeJS'
     }
@@ -14,14 +15,15 @@ pipeline {
         stage('Build') {
             steps {
                 sh 'npm install'
-                sh 'npm run build -- --skip-tests'
+                sh 'npm run build'
             }
         }
 
         stage('Build Docker Image') {
             steps {
                 script {
-                    def imageName = "ratneshpuskar/docker-react:${env.BUILD_NUMBER}"
+                    def repoName = 'docker-react'.toLowerCase()
+                    def imageName = "ratneshpuskar/${repoName}:${env.BUILD_NUMBER}"
                     sh "docker build -t ${imageName} ."
                 }
             }
@@ -32,7 +34,8 @@ pipeline {
                 script {
                     withCredentials([usernamePassword(credentialsId: 'dockerhub_credentials', passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USERNAME')]) {
                         sh 'echo ${DOCKER_PASSWORD} | docker login -u ${DOCKER_USERNAME} --password-stdin'
-                        def imageName = "ratneshpuskar/docker-react:${env.BUILD_NUMBER}"
+                        def repoName = 'docker-react'.toLowerCase()
+                        def imageName = "ratneshpuskar/${repoName}:${env.BUILD_NUMBER}"
                         sh "docker push ${imageName}"
                     }
                 }
