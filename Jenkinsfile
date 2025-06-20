@@ -14,13 +14,14 @@ pipeline {
         stage('Build') {
             steps {
                 sh 'npm install'
+                sh 'npm run build --if-present'
             }
         }
 
         stage('Build Docker Image') {
             steps {
                 script {
-                    def imageName = "ratneshpuskar/docker-react:${env.BUILD_NUMBER.toLowerCase()}"
+                    def imageName = "ratneshpuskar/docker-react:${env.BUILD_NUMBER}"
                     sh "docker build -t ${imageName} ."
                 }
             }
@@ -30,8 +31,8 @@ pipeline {
             steps {
                 script {
                     withCredentials([usernamePassword(credentialsId: 'dockerhub_credentials', passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USERNAME')]) {
-                        sh 'echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin'
-                        def imageName = "ratneshpuskar/docker-react:${env.BUILD_NUMBER.toLowerCase()}"
+                        sh "echo ${DOCKER_PASSWORD} | docker login -u ${DOCKER_USERNAME} --password-stdin"
+                        def imageName = "ratneshpuskar/docker-react:${env.BUILD_NUMBER}"
                         sh "docker push ${imageName}"
                     }
                 }
@@ -60,7 +61,7 @@ spec:
     spec:
       containers:
       - name: docker-react
-        image: ratneshpuskar/docker-react:${env.BUILD_NUMBER.toLowerCase()}
+        image: ratneshpuskar/docker-react:${env.BUILD_NUMBER}
         ports:
         - containerPort: 80
 """
