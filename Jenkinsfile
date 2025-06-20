@@ -14,7 +14,7 @@ pipeline {
         stage('Build') {
             steps {
                 sh 'npm install'
-                sh 'npm run build -- --skip-tests'
+                sh 'npm run build'
             }
         }
 
@@ -40,7 +40,7 @@ pipeline {
                 }
             }
         }
-
+        
         stage('Deploy to Kubernetes') {
             steps {
                 script {
@@ -48,21 +48,21 @@ pipeline {
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: dockerreact-deployment
+  name: docker-react-deployment
   labels:
-    app: dockerreact
+    app: docker-react
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: dockerreact
+      app: docker-react
   template:
     metadata:
       labels:
-        app: dockerreact
+        app: docker-react
     spec:
       containers:
-      - name: dockerreact
+      - name: docker-react
         image: ratneshpuskar/docker-react:${env.BUILD_NUMBER}
         ports:
         - containerPort: 80
@@ -72,10 +72,10 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: dockerreact-service
+  name: docker-react-service
 spec:
   selector:
-    app: dockerreact
+    app: docker-react
   ports:
   - protocol: TCP
     port: 80
