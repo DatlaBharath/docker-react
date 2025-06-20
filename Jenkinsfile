@@ -1,6 +1,5 @@
 pipeline {
     agent any
-
     tools {
         nodejs 'NodeJS'
     }
@@ -14,7 +13,7 @@ pipeline {
 
         stage('Build') {
             steps {
-                sh 'npm install'
+                sh 'npm install --only=production'
                 sh 'npm run build'
             }
         }
@@ -44,50 +43,50 @@ pipeline {
             steps {
                 script {
                     def deploymentYaml = """
-                    apiVersion: apps/v1
-                    kind: Deployment
-                    metadata:
-                      name: docker-react-deployment
-                      labels:
-                        app: docker-react
-                    spec:
-                      replicas: 1
-                      selector:
-                        matchLabels:
-                          app: docker-react
-                      template:
-                        metadata:
-                          labels:
-                            app: docker-react
-                        spec:
-                          containers:
-                          - name: docker-react
-                            image: ratneshpuskar/docker-react:${env.BUILD_NUMBER}
-                            ports:
-                            - containerPort: 80
-                    """
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: docker-react-deployment
+  labels:
+    app: docker-react
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: docker-react
+  template:
+    metadata:
+      labels:
+        app: docker-react
+    spec:
+      containers:
+      - name: docker-react
+        image: ratneshpuskar/docker-react:${env.BUILD_NUMBER}
+        ports:
+        - containerPort: 80
+"""
 
                     def serviceYaml = """
-                    apiVersion: v1
-                    kind: Service
-                    metadata:
-                      name: docker-react-service
-                    spec:
-                      selector:
-                        app: docker-react
-                      ports:
-                      - protocol: TCP
-                        port: 80
-                        targetPort: 80
-                        nodePort: 30007
-                      type: NodePort
-                    """
+apiVersion: v1
+kind: Service
+metadata:
+  name: docker-react-service
+spec:
+  selector:
+    app: docker-react
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 80
+    nodePort: 30007
+  type: NodePort
+"""
 
-                    sh """echo "${deploymentYaml}" > deployment.yaml"""
-                    sh """echo "${serviceYaml}" > service.yaml"""
+                    sh """echo "$deploymentYaml" > deployment.yaml"""
+                    sh """echo "$serviceYaml" > service.yaml"""
 
-                    sh 'ssh -i /var/test.pem -o StrictHostKeyChecking=no ubuntu@13.126.236.250 "kubectl apply -f -" < deployment.yaml'
-                    sh 'ssh -i /var/test.pem -o StrictHostKeyChecking=no ubuntu@13.126.236.250 "kubectl apply -f -" < service.yaml'
+                    sh 'ssh -i /var/test.pem -o StrictHostKeyChecking=no ubuntu@13.201.12.52 "kubectl apply -f -" < deployment.yaml'
+                    sh 'ssh -i /var/test.pem -o StrictHostKeyChecking=no ubuntu@13.201.12.52 "kubectl apply -f -" < service.yaml'
                 }
             }
         }
