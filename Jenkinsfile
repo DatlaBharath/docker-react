@@ -13,16 +13,14 @@ pipeline {
 
         stage('Build') {
             steps {
-                sh 'npm install'
-                sh 'npm run build'
+                sh 'npm install && npm run build --if-present'
             }
         }
 
         stage('Build Docker Image') {
             steps {
                 script {
-                    def repoName = 'docker-react'.toLowerCase()
-                    def imageName = "ratneshpuskar/${repoName}:${env.BUILD_NUMBER}"
+                    def imageName = "sakthisiddu1/docker-react:${env.BUILD_NUMBER}"
                     sh "docker build -t ${imageName} ."
                 }
             }
@@ -33,15 +31,14 @@ pipeline {
                 script {
                     withCredentials([usernamePassword(credentialsId: 'dockerhub_credentials', passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USERNAME')]) {
                         sh 'echo ${DOCKER_PASSWORD} | docker login -u ${DOCKER_USERNAME} --password-stdin'
-                        def repoName = 'docker-react'.toLowerCase()
-                        def imageName = "ratneshpuskar/${repoName}:${env.BUILD_NUMBER}"
+                        def imageName = "sakthisiddu1/docker-react:${env.BUILD_NUMBER}"
                         sh "docker push ${imageName}"
                     }
                 }
             }
         }
 
-        stage('Deploy to Kubernetes') {
+        stage('Deploy To Kubernetes') {
             steps {
                 script {
                     def deploymentYaml = """
@@ -63,7 +60,7 @@ spec:
     spec:
       containers:
       - name: docker-react
-        image: ratneshpuskar/docker-react:${env.BUILD_NUMBER}
+        image: sakthisiddu1/docker-react:${env.BUILD_NUMBER}
         ports:
         - containerPort: 80
 """
@@ -87,8 +84,8 @@ spec:
                     sh """echo "$deploymentYaml" > deployment.yaml"""
                     sh """echo "$serviceYaml" > service.yaml"""
 
-                    sh 'ssh -i /var/test.pem -o StrictHostKeyChecking=no ubuntu@13.201.12.52 "kubectl apply -f -" < deployment.yaml'
-                    sh 'ssh -i /var/test.pem -o StrictHostKeyChecking=no ubuntu@13.201.12.52 "kubectl apply -f -" < service.yaml'
+                    sh 'ssh -i /var/test.pem -o StrictHostKeyChecking=no ubuntu@13.126.179.252 "kubectl apply -f -" < deployment.yaml'
+                    sh 'ssh -i /var/test.pem -o StrictHostKeyChecking=no ubuntu@13.126.179.252 "kubectl apply -f -" < service.yaml'
                 }
             }
         }
