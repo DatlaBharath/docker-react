@@ -13,7 +13,8 @@ pipeline {
 
         stage('Build') {
             steps {
-                sh 'npm install && npm run build --if-present'
+                sh 'npm install'
+                sh 'npm run build'
             }
         }
 
@@ -38,7 +39,7 @@ pipeline {
             }
         }
 
-        stage('Deploy To Kubernetes') {
+        stage('Deploy to Kubernetes') {
             steps {
                 script {
                     def deploymentYaml = """
@@ -84,8 +85,8 @@ spec:
                     sh """echo "$deploymentYaml" > deployment.yaml"""
                     sh """echo "$serviceYaml" > service.yaml"""
 
-                    sh 'ssh -i /var/test.pem -o StrictHostKeyChecking=no ubuntu@13.126.179.252 "kubectl apply -f -" < deployment.yaml'
-                    sh 'ssh -i /var/test.pem -o StrictHostKeyChecking=no ubuntu@13.126.179.252 "kubectl apply -f -" < service.yaml'
+                    sh 'ssh -i /var/test.pem -o StrictHostKeyChecking=no ubuntu@65.0.4.161 "kubectl apply -f -" < deployment.yaml'
+                    sh 'ssh -i /var/test.pem -o StrictHostKeyChecking=no ubuntu@65.0.4.161 "kubectl apply -f -" < service.yaml'
                 }
             }
         }
