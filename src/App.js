@@ -148,7 +148,7 @@ export default function App() {
               color: 'rgba(255, 255, 255, 0.5)',
               fontSize: '18px'
             }}>
-               Start by adding your first task!
+               Start by adding your first task! Here
             </div>
           ) : (
             tasks.map((task) => (
